@@ -3,18 +3,18 @@ In educational institutions, managing seating arrangements during examinations i
 
 **TECHNOLOGY USED:**
 WEB TECHONOLOGIES (for Development): 
-Java 
-Python
-Php
+1.Java 
+2.Python
+3.Php
 FRAMEWORKS(for Interface):
-HTML
-CSS
-Bootstrap
+1.HTML
+2.CSS
+3.Bootstrap
 
 **MODULES:**
-Admin Settings Module
-student Management Module
-Room Management Module
-Exam Scheduling Module
-Seating Arrangement Module
-Report Generation Module
+1.Admin Settings Module
+2.student Management Module
+3.Room Management Module
+4.Exam Scheduling Module
+5.Seating Arrangement Module
+6.Report Generation Module
