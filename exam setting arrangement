@@ -1,0 +1,228 @@
+// Import required modules 
+const express = require('express'); 
+const mysql   = require('mysql2'); 
+const cors    = require('cors'); 
+const app  = express(); 
+const PORT = 5000; 
+// Middleware 
+app.use(cors()); 
+app.use(express.json()); 
+// Database connection 
+const db = mysql.createConnection({ 
+host: 'localhost', 
+user: 'root', 
+password: 'your_password', 
+database: 'bloodbank_db' 
+}); 
+db.connect((err) => { 
+if (err) { 
+console.error('Database connection failed:', err.message); 
+return; 
+} 
+console.log('Connected to MySQL database.'); 
+}); 
+// Root API 
+app.get('/', (req, res) => { 
+res.json({ message: 'Blood Bank Management System API is running.' }); 
+}); 
+// Get all donors 
+app.get('/api/donors', (req, res) => { 
+db.query('SELECT * FROM Donor', (err, result) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+ 
+res.json(result); 
+}); 
+}); 
+// Add donor 
+app.post('/api/donors', (req, res) => { 
+const { name, age, blood_group, contact, email, address, donation_date } = req.body; 
+const sql = `INSERT INTO Donor (name, age, blood_group, contact, email, address, 
+donation_date) 
+VALUES (?, ?, ?, ?, ?, ?, ?)`; 
+db.query(sql, [name, age, blood_group, contact, email, address, donation_date], (err, 
+result) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+// Update blood stock 
+db.query("UPDATE BloodStock SET units = units + 1 WHERE blood_group = ?", 
+[blood_group]); 
+res.json({ message: "Donor added successfully", donor_id: result.insertId }); 
+}); 
+}); 
+// Get blood stock 
+app.get('/api/blood-stock', (req, res) => { 
+db.query('SELECT * FROM BloodStock', (err, result) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+res.json(result); 
+}); 
+}); 
+// Add patient 
+app.post('/api/patients', (req, res) => { 
+const { name, age, blood_group, contact, hospital } = req.body; 
+const sql = "INSERT INTO Patient (name, age, blood_group, contact, hospital) 
+VALUES (?, ?, ?, ?, ?)"; 
+db.query(sql, [name, age, blood_group, contact, hospital], (err, result) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+res.json({ patient_id: result.insertId }); 
+}); 
+ 
+}); 
+// Get requests 
+app.get('/api/requests', (req, res) => { 
+const sql = ` 
+SELECT br.request_id, p.name AS patient_name, p.hospital, 
+br.blood_group, br.units, br.status, br.request_date 
+FROM BloodRequest br 
+JOIN Patient p ON br.patient_id = p.patient_id 
+ORDER BY br.request_date DESC 
+`; 
+db.query(sql, (err, result) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+res.json(result); 
+}); 
+}); 
+// Add request 
+app.post('/api/requests', (req, res) => { 
+const { patient_id, blood_group, units } = req.body; 
+const sql = "INSERT INTO BloodRequest (patient_id, blood_group, units) VALUES 
+(?, ?, ?)"; 
+db.query(sql, [patient_id, blood_group, units], (err, result) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+res.json({ message: "Request submitted", request_id: result.insertId }); 
+}); 
+}); 
+// Update request status 
+app.put('/api/requests/:id', (req, res) => { 
+const { status } = req.body; 
+db.query("UPDATE BloodRequest SET status = ? WHERE request_id = ?", 
+[status, req.params.id], 
+(err) => { 
+if (err) return res.status(500).json({ error: err.message }); 
+res.json({ message: "Status updated successfully" }); 
+}); 
+}); 
+// Start server 
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
+2 Frontend 
+import React, { useState } from 'react'; 
+import DonorForm from './components/DonorForm'; 
+import BloodStock from './components/BloodStock'; 
+import RequestForm from './components/RequestForm'; 
+import RequestList from './components/RequestList'; 
+import './App.css'; 
+function App() { 
+const [activeTab, setActiveTab] = useState('stock'); 
+return ( 
+<div> 
+<h1>Blood Bank Management System</h1> 
+<button onClick={() => setActiveTab('stock')}>Stock</button> 
+<button onClick={() => setActiveTab('donor')}>Add Donor</button> 
+<button onClick={() => setActiveTab('request')}>Request</button> 
+<button onClick={() => setActiveTab('requests')}>View Requests</button> 
+{activeTab === 'stock' && <BloodStock />} 
+{activeTab === 'donor' && <DonorForm />} 
+{activeTab === 'request' && <RequestForm />} 
+{activeTab === 'requests' && <RequestList />} 
+</div> 
+); 
+} 
+export default App; 
+import React, { useState } from 'react'; 
+export function DonorForm() { 
+const [form, setForm] = useState({ 
+name: '', 
+age: '', 
+blood_group: '', 
+contact: '' 
+}); 
+ 
+const handleSubmit = async (e) => { 
+e.preventDefault(); 
+await fetch('http://localhost:5000/api/donors', { 
+method: 'POST', 
+headers: { 'Content-Type': 'application/json' }, 
+body: JSON.stringify(form) 
+}); 
+alert("Donor Added"); 
+}; 
+return ( 
+<form onSubmit={handleSubmit}> 
+<input placeholder="Name" 
+onChange={e => setForm({ ...form, name: e.target.value })} /> 
+<input placeholder="Age" 
+onChange={e => setForm({ ...form, age: e.target.value })} /> 
+<input placeholder="Blood Group" 
+onChange={e => setForm({ ...form, blood_group: e.target.value })} /> 
+<input placeholder="Contact" 
+onChange={e => setForm({ ...form, contact: e.target.value })} /> 
+<button type="submit">Submit</button> 
+</form> 
+); 
+} 
+import React, { useEffect, useState } from 'react'; 
+export function BloodStock() { 
+const [stock, setStock] = useState([]); 
+useEffect(() => { 
+fetch('http://localhost:5000/api/blood-stock') 
+.then(res => res.json()) 
+.then(data => setStock(data)); 
+}, []); 
+ 
+return ( 
+<div> 
+<h2>Blood Stock</h2> 
+{stock.map(item => ( 
+<p key={item.stock_id}> 
+{item.blood_group} : {item.units} 
+</p> 
+))} 
+</div> 
+); 
+} 
+import React, { useState } from 'react'; 
+export function RequestForm() { 
+const [form, setForm] = useState({ 
+patient_id: '', 
+blood_group: '', 
+units: '' 
+}); 
+const handleSubmit = async (e) => { 
+e.preventDefault(); 
+await fetch('http://localhost:5000/api/requests', { 
+method: 'POST', 
+headers: { 'Content-Type': 'application/json' }, 
+body: JSON.stringify(form) 
+}); 
+alert("Request Submitted"); 
+}; 
+return ( 
+<form onSubmit={handleSubmit}> 
+<input placeholder="Patient ID" 
+onChange={e => setForm({ ...form, patient_id: e.target.value })} /> 
+<input placeholder="Blood Group" 
+onChange={e => setForm({ ...form, blood_group: e.target.value })} /> 
+<input placeholder="Units" 
+onChange={e => setForm({ ...form, units: e.target.value })} /> 
+ 
+<button type="submit">Submit</button> 
+</form> 
+); 
+} 
+import React, { useEffect, useState } from 'react'; 
+export function RequestList() { 
+const [requests, setRequests] = useState([]); 
+useEffect(() => { 
+fetch('http://localhost:5000/api/requests') 
+.then(res => res.json()) 
+.then(data => setRequests(data)); 
+}, []); 
+return ( 
+<div> 
+<h2>All Requests</h2> 
+{requests.map(req => ( 
+<p key={req.request_id}> 
+{req.patient_name} - {req.blood_group} - {req.status} 
+</p> 
+))} 
+</div> 
+); 
